@@ -1,20 +1,17 @@
-import dataclasses
 import decimal
 import json
 import sys
 from decimal import Decimal
 
+from consts import EXBIBYTE, PEBIBYTE, DAY
 from miner import MinerState
 from network import NetworkState
-
-EXBIBYTE = 1 << 60
-DAY = 2880
 
 def main(args):
     # TODO flags
     # epochs := flag.Int("epochs", math.MaxInt32, "epochs to simulate")
     epochs = 366 * DAY
-    print_interval = 2880
+    print_interval = DAY
 
     # Establish decimal context for FIL tokens.
     # NOTE: A precision of 18 is not the same as 18 decimal places, it's precision of
@@ -23,7 +20,7 @@ def main(args):
     c = decimal.getcontext()
     c.prec = 18
 
-    network_power = 10 * EXBIBYTE
+    network_power = 18 * EXBIBYTE
     power_baseline = network_power
     epoch_reward = Decimal("90.0")
     circulating_supply = Decimal("439_000_000")
@@ -31,12 +28,12 @@ def main(args):
 
     balance = 10 * Decimal("1000")
     m = MinerState(balance)
-    s = MinerStrategy(1 << 40, 365 * DAY)
+    s = MinerStrategy(1 * PEBIBYTE, 365 * DAY)
     rew = RewardEmitter()
 
     # Loop over epochs
     first_epoch = net.epoch
-    for epoch in range (first_epoch, epochs):
+    for epoch in range(first_epoch, epochs):
         net.epoch = epoch
 
         # Emit rewards according to power at start of epoch.
@@ -72,15 +69,15 @@ class MinerStrategy:
 
     def act(self, net: NetworkState, m: MinerState):
         if not self.initial_onboard_done:
-            m.activate_sectors(net, self.initial_onboard, self.initial_duration)
+            m.activate_sectors(net, self.initial_onboard, self.initial_duration, pledge=Decimal(0))
             self.initial_onboard_done = True
 
 class RewardEmitter:
     """An unrealistically smooth emission of a share of reward every epoch."""
-    def emit(self, net: NetworkState, m: MinerState):
-        share = Decimal(m.power) * net.epoch_reward / Decimal(net.power)
-        m.receive_reward(share)
 
+    def emit(self, net: NetworkState, m: MinerState):
+        share = net.epoch_reward * Decimal(m.power) / Decimal(net.power)
+        m.receive_reward(net, share)
 
 class EnhancedJSONEncoder(json.JSONEncoder):
     def default(self, obj):
