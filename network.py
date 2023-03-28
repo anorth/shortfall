@@ -4,6 +4,7 @@ from decimal import Decimal
 
 @dataclass
 class NetworkState:
+    epoch: int
     power: int
     power_baseline: int
     circulating_supply: Decimal
