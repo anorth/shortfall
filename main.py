@@ -1,10 +1,8 @@
 import collections
-import decimal
 import json
 import sys
 import time
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Iterable, Dict, List
 
 from consts import EXBIBYTE, PEBIBYTE, DAY
@@ -17,20 +15,13 @@ def main(args):
     epochs = 366 * DAY
     stats_interval = DAY
 
-    # Establish decimal context for FIL tokens.
-    # NOTE: A precision of 18 is not the same as 18 decimal places, it's precision of
-    # the mantissa.
-    # A fixed-point representation might be needed.
-    c = decimal.getcontext()
-    c.prec = 18
-
     cfg = Config(
         network_epoch=0,
         network_power=18 * EXBIBYTE,
-        network_epoch_reward=Decimal("90"),
-        network_circulating_supply=Decimal("439_000_000"),
+        network_epoch_reward=90.0,
+        network_circulating_supply=439_000_000.0,
 
-        miner_balance=Decimal("10_000"),
+        miner_balance=10_000.0,
 
         strategy_initial_power=1 * PEBIBYTE,
         strategy_initial_duration=365 * DAY,
@@ -42,7 +33,7 @@ def main(args):
     end_time = time.perf_counter()
 
     for s in stats:
-        print(json.dumps(s, cls=EnhancedJSONEncoder))
+        print(json.dumps(s))
     latency = end_time - start_time
     print("Simulated {} epochs in {:.1f} sec".format(epochs, latency))
 
@@ -50,10 +41,10 @@ def main(args):
 class Config:
     network_epoch: int
     network_power: int
-    network_epoch_reward: Decimal
-    network_circulating_supply: Decimal
+    network_epoch_reward: float
+    network_circulating_supply: float
 
-    miner_balance: Decimal
+    miner_balance: float
 
     strategy_initial_power: int
     strategy_initial_duration: int
@@ -123,22 +114,22 @@ class MinerStrategy:
 
     def act(self, net: NetworkState, m: MinerState):
         if not self.initial_onboard_done:
-            m.activate_sectors(net, self.initial_onboard, self.initial_duration, pledge=Decimal(0))
+            m.activate_sectors(net, self.initial_onboard, self.initial_duration, pledge=0.0)
             self.initial_onboard_done = True
 
 class RewardEmitter:
     """An unrealistically smooth emission of a share of reward every epoch."""
 
     def emit(self, net: NetworkState, m: MinerState):
-        share = net.epoch_reward * Decimal(m.power) / Decimal(net.power)
+        share = net.epoch_reward * m.power / net.power
         m.receive_reward(net, share)
 
-class EnhancedJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return str(obj)
-        else:
-            return super().default(obj)
+# class EnhancedJSONEncoder(json.JSONEncoder):
+#     def default(self, obj):
+#         if isinstance(obj, Decimal):
+#             return str(obj)
+#         else:
+#             return super().default(obj)
 
 if __name__ == '__main__':
     main(sys.argv)

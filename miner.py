@@ -1,23 +1,23 @@
-from decimal import Decimal
+import math
 from typing import NamedTuple
 
 from consts import SECTOR_SIZE, DAY
 from network import NetworkState
 
 MAX_REPAYMENT_TERM = 365 * DAY
-MAX_REPAYMENT_REWARD_FRACTION = Decimal("0.75")
-MAX_FEE_REWARD_FRACTION = Decimal("0.25")
+MAX_REPAYMENT_REWARD_FRACTION = 0.75
+MAX_FEE_REWARD_FRACTION = 0.25
 
 class SectorBunch(NamedTuple):
     power: int
-    pledge: Decimal
+    pledge: float
 
 class MinerState:
-    def __init__(self, balance: Decimal):
+    def __init__(self, balance: float):
         self.power: int = 0
-        self.balance: Decimal = balance
-        self.initial_pledge: Decimal = Decimal(0)
-        self.initial_pledge_satisfied: Decimal = Decimal(0)
+        self.balance: float = balance
+        self.initial_pledge: float = 0.0
+        self.initial_pledge_satisfied: float = 0.0
 
         # Scheduled expiration of power, by epoch.
         self._expirations: dict[int, list[SectorBunch]] = {}
@@ -36,10 +36,10 @@ class MinerState:
             'shortfall_fraction': shortfall_fraction,
         }
 
-    def available_balance(self) -> Decimal:
+    def available_balance(self) -> float:
         return self.balance - self.initial_pledge
 
-    def activate_sectors(self, net: NetworkState, power: int, duration: int, pledge: Decimal = Decimal("Inf")):
+    def activate_sectors(self, net: NetworkState, power: int, duration: int, pledge: float = float("inf")):
         # Round the power to a multiple of sector size.
         power = SECTOR_SIZE * (power // SECTOR_SIZE)
 
@@ -48,7 +48,7 @@ class MinerState:
             min(duration, MAX_REPAYMENT_TERM))
         minimum_pledge = pledge_requirement - incremental_shortfall
 
-        if pledge.is_zero():
+        if pledge == 0:
             pledge = minimum_pledge
         elif pledge > pledge_requirement:
             pledge = pledge_requirement
@@ -74,12 +74,12 @@ class MinerState:
             raise RuntimeError(
                 f"miner pledge satisfaction {self.initial_pledge_satisfied} below minimum {miner_min_satisfaction}")
 
-    def receive_reward(self, net: NetworkState, reward: Decimal):
+    def receive_reward(self, net: NetworkState, reward: float):
         # Vesting is ignored.
         self.balance += reward
 
         # Calculate shortfall rate as parameter to repayment and fee.
-        assert MAX_FEE_REWARD_FRACTION + MAX_REPAYMENT_REWARD_FRACTION <= Decimal(1)
+        assert MAX_FEE_REWARD_FRACTION + MAX_REPAYMENT_REWARD_FRACTION <= 1.0
         shortfall_frac = self.shortfall_fraction(net)
 
         # Burn the fee
@@ -87,9 +87,8 @@ class MinerState:
         fee_amount = reward * fee_take_rate
         self.balance -= fee_amount
 
-        # Lock repayments as satisifed pledge.
-        repayment_take_rate = (Decimal("0.25") + Decimal("0.75") * shortfall_frac.sqrt()) * \
-                              MAX_REPAYMENT_REWARD_FRACTION
+        # Lock repayments as satisified pledge.
+        repayment_take_rate = (0.25 + 0.75 * math.sqrt(shortfall_frac)) * MAX_REPAYMENT_REWARD_FRACTION
         repayment_amount = reward * repayment_take_rate
         self.initial_pledge_satisfied += repayment_amount
         assert fee_amount + repayment_amount <= reward
@@ -105,12 +104,12 @@ class MinerState:
             self.initial_pledge -= sb.pledge
             self.initial_pledge_satisfied -= pledge_to_release
 
-    def shortfall_fraction(self, net):
+    def shortfall_fraction(self, net) -> float:
         """The current shortfall as a fraction of the maximum allowed."""
         max_shortfall = MAX_REPAYMENT_REWARD_FRACTION * net.expected_reward_for_power(self.power, MAX_REPAYMENT_TERM)
         actual_shortfall = self.initial_pledge - self.initial_pledge_satisfied
-        shortfall_frac = Decimal(0)
+        shortfall_frac = 0.0
         if max_shortfall > 0:
             shortfall_frac = actual_shortfall / max_shortfall
-        shortfall_frac = min(shortfall_frac, Decimal(1))  # Clamp in case of over-shortfall
+        shortfall_frac = min(shortfall_frac, 1.0)  # Clamp in case of over-shortfall
         return shortfall_frac
