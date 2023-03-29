@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from consts import DAY, SECTOR_SIZE
+from consts import DAY, SECTOR_SIZE, YEAR
 
 SUPPLY_LOCK_TARGET = 0.30
 
@@ -17,6 +17,7 @@ class NetworkState:
     power_baseline: int
     circulating_supply: float
     epoch_reward: float
+    token_lease_fee: float
 
     def initial_pledge_for_power(self, power: int) -> float:
         """The initial pledge requirement for an incremental power addition."""
@@ -44,3 +45,6 @@ class NetworkState:
         # TODO: add duration parameter = min (duration, MAX_REPAYMENT_TERM)
         return satisfaction / (1 - MAX_REPAYMENT_REWARD_FRACTION * MAX_REPAYMENT_TERM * self.epoch_reward / (
                     INITIAL_PLEDGE_PROJECTION_PERIOD * self.epoch_reward + SUPPLY_LOCK_TARGET * self.circulating_supply))
+
+    def fee_for_token_lease(self, amount: float, duration: int) -> float:
+        return amount * self.token_lease_fee * duration / YEAR

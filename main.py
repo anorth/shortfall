@@ -7,24 +7,30 @@ from typing import Iterable, Dict, List
 from consts import EXBIBYTE, PEBIBYTE, DAY
 from miner import MinerState
 from network import NetworkState
+from strategy import StrategyConfig, MinerStrategy
 
 def main(args):
     # TODO: argument processing
     epochs = 366 * DAY
     stats_interval = DAY
 
-    cfg = Config(
+    cfg = SimConfig(
         network_epoch=0,
         network_power=18 * EXBIBYTE,
         network_epoch_reward=90.0,
         network_circulating_supply=439_000_000.0,
+        network_token_lease_fee=0.20,
 
-        miner_balance=10_000.0,
+        miner_balance=0,
 
-        strategy_max_power=10 * PEBIBYTE,
-        strategy_max_power_onboard=10 * PEBIBYTE,
-        strategy_max_pledge_onboard=10_000.0,
-        strategy_commitment_duration=365 * DAY,
+        strategy=StrategyConfig(
+            max_power=10 * PEBIBYTE,
+            max_power_onboard=10 * PEBIBYTE,
+            max_pledge_onboard=1_000.0,
+            commitment_duration=365 * DAY,
+            max_pledge_lease=1000,
+            take_shortfall=True,
+        )
     )
     sim = Simulator(cfg)
 
@@ -38,29 +44,27 @@ def main(args):
     print("Simulated {} epochs in {:.1f} sec".format(epochs, latency))
 
 @dataclass
-class Config:
+class SimConfig:
     network_epoch: int
     network_power: int
     network_epoch_reward: float
     network_circulating_supply: float
+    # Fee p.a. on externally leased tokens.
+    network_token_lease_fee: float
 
     miner_balance: float
 
-    strategy_max_power: int
-    strategy_max_power_onboard: int
-    strategy_max_pledge_onboard: float
-    strategy_commitment_duration: int
+    strategy: StrategyConfig
 
 class Simulator:
     """A simulator for a single miner's strategy in a network context."""
 
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: SimConfig):
         power_baseline = 0  # TODO: derive baseline from network epoch instead
         self.net = NetworkState(cfg.network_epoch, cfg.network_power, power_baseline, cfg.network_circulating_supply,
-            cfg.network_epoch_reward)
+            cfg.network_epoch_reward, cfg.network_token_lease_fee)
         self.miner = MinerState(cfg.miner_balance)
-        self.strategy = MinerStrategy(cfg.strategy_max_power, cfg.strategy_max_power_onboard,
-            cfg.strategy_max_pledge_onboard, cfg.strategy_commitment_duration)
+        self.strategy = MinerStrategy(cfg.strategy)
         self.rewards = RewardEmitter()
 
     def run(self, epochs, stats_interval=1) -> Iterable[Dict]:
@@ -101,38 +105,6 @@ class Simulator:
         }
         stats.update(self.miner.summary())
         return stats
-
-class MinerStrategy:
-    def __init__(self, max_power: int, max_power_onboard: int, max_pledge_onboard: float, commitment_duration: int):
-        # The maximum amount of storage power available at any one time.
-        self.max_power: int = max_power
-        # The maximum total amount of onboarding to perform ever.
-        # Prevents re-investment after this amount (even after power expires).
-        self.max_power_onboard: int = max_power_onboard
-        # The maximum total tokens to pledge ever.
-        # Prevents re-investment after this amount (even after pledge is returned).
-        self.max_pledge_onboard = max_pledge_onboard
-        # Commitment duration for onboarded power.
-        self.commitment_duration: int = commitment_duration
-
-        self.take_shortfall = True
-        self._onboarded = 0
-        self._pledged = 0.0
-
-    def act(self, net: NetworkState, m: MinerState):
-        available_for_pledging = min(m.available_balance(), self.max_pledge_onboard - self._pledged)
-        if self.take_shortfall:
-            target_pledge = net.max_pledge_for_tokens(available_for_pledging)
-        else:
-            target_pledge = available_for_pledging
-
-        target_power = min(self.max_power - m.power, net.power_for_initial_pledge(target_pledge))
-        target_power = min(target_power, self.max_power_onboard - self._onboarded)
-
-        if target_power > 0:
-            power, pledge = m.activate_sectors(net, target_power, self.commitment_duration, pledge=m.available_balance())
-            self._onboarded += power
-            self._pledged += pledge
 
 class RewardEmitter:
     """An unrealistically smooth emission of a share of reward every epoch."""

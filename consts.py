@@ -7,4 +7,5 @@ TIBIBYTE = 1 << 40
 GIBIBYTE = 1 << 30
 
 DAY = 2880
+YEAR = 365 * DAY
 
