@@ -28,19 +28,32 @@ class MinerStrategy:
         self._pledged = 0.0
 
     def act(self, net: NetworkState, m: MinerState):
-        available_tokens = m.available_balance() + (self.cfg.max_pledge_lease - m.lease)
-        available_pledge = min(available_tokens, self.cfg.max_pledge_onboard - self._pledged)
+        available_lock = m.available_balance() + (self.cfg.max_pledge_lease - m.lease)
+        available_lock = min(available_lock, self.cfg.max_pledge_onboard - self._pledged)
         if self.cfg.take_shortfall:
-            target_pledge = net.max_pledge_for_tokens(available_pledge)
+            available_pledge = net.max_pledge_for_tokens(available_lock)
         else:
-            target_pledge = available_pledge
+            available_pledge = available_lock
 
-        target_power = min(self.cfg.max_power - m.power, net.power_for_initial_pledge(target_pledge))
-        target_power = min(target_power, self.cfg.max_power_onboard - self._onboarded)
+        target_power = min(self.cfg.max_power - m.power, self.cfg.max_power_onboard - self._onboarded)
+        power_for_pledge = net.power_for_initial_pledge(available_pledge)
+
+        # Set power and lock amounts depending on which is the limiting factor.
+        if target_power <= power_for_pledge:
+            # Limited by power, so pledge either all available, or zero (which will result in minimum with shortfall)
+            if self.cfg.take_shortfall:
+                lock = 0
+            else:
+                lock = available_lock
+        else:
+            # Limited by pledge
+            lock = available_lock
+            target_power = power_for_pledge
+
         # Round power to a multiple of sector size.
         target_power = (target_power // SECTOR_SIZE) * SECTOR_SIZE
 
         if target_power > 0:
-            power, pledge = m.activate_sectors(net, target_power, self.cfg.commitment_duration, pledge=available_tokens)
+            power, pledge = m.activate_sectors(net, target_power, self.cfg.commitment_duration, lock=lock)
             self._onboarded += power
             self._pledged += pledge

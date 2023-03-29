@@ -24,9 +24,9 @@ def main(args):
         miner_balance=0,
 
         strategy=StrategyConfig(
-            max_power=10 * PEBIBYTE,
-            max_power_onboard=10 * PEBIBYTE,
-            max_pledge_onboard=1_000.0,
+            max_power=1 * PEBIBYTE,
+            max_power_onboard=1 * PEBIBYTE,
+            max_pledge_onboard=1000,
             commitment_duration=365 * DAY,
             max_pledge_lease=1000,
             take_shortfall=True,
@@ -112,13 +112,6 @@ class RewardEmitter:
     def emit(self, net: NetworkState, m: MinerState):
         share = net.epoch_reward * m.power / net.power
         m.receive_reward(net, share)
-
-# class EnhancedJSONEncoder(json.JSONEncoder):
-#     def default(self, obj):
-#         if isinstance(obj, Decimal):
-#             return str(obj)
-#         else:
-#             return super().default(obj)
 
 if __name__ == '__main__':
     main(sys.argv)

@@ -49,12 +49,12 @@ class MinerState:
     def available_balance(self) -> float:
         return self.balance - self.pledge_locked
 
-    def activate_sectors(self, net: NetworkState, power: int, duration: int, pledge: float = float("inf")) -> (int, float):
+    def activate_sectors(self, net: NetworkState, power: int, duration: int, lock: float = float("inf")) -> (int, float):
         """
         Activates power and locks a specified pledge.
-        Pledge may be 0, meaning to lock the minimum (after shortfall), or inf to lock the full requirement.
-        If available balance is insufficient for the specified pledge, the pledge is leased.
-        Returns the power (rounded) and pledge locked.
+        Lock may be 0, meaning to lock the minimum (after shortfall), or inf to lock the full pledge requirement.
+        If available balance is insufficient for the specified locking, the tokens are leased.
+        Returns the power and pledge locked.
         """
         assert power % SECTOR_SIZE == 0
 
@@ -63,17 +63,17 @@ class MinerState:
             min(duration, MAX_REPAYMENT_TERM))
         minimum_pledge = pledge_requirement - incremental_shortfall
 
-        if pledge == 0:
-            pledge = minimum_pledge
-        elif pledge > pledge_requirement:
-            pledge = pledge_requirement
-        elif pledge < minimum_pledge:
-            raise RuntimeError(f"pledge {pledge} less than minimum {pledge_requirement}")
-        self._lease(max(pledge - self.available_balance(), 0))
+        if lock == 0:
+            lock = minimum_pledge
+        elif lock > pledge_requirement:
+            lock = pledge_requirement
+        elif lock < minimum_pledge:
+            raise RuntimeError(f"lock {lock} is less than minimum pledge {pledge_requirement}")
+        self._lease(max(lock - self.available_balance(), 0))
 
         self.power += power
         self.pledge_required += pledge_requirement
-        self.pledge_locked += pledge
+        self.pledge_locked += lock
         expiration = net.epoch + duration
         self._expirations.setdefault(expiration, []).append(SectorBunch(power, pledge_requirement))
 
@@ -87,7 +87,7 @@ class MinerState:
             raise RuntimeError(
                 f"miner pledge satisfaction {self.pledge_locked} below minimum {miner_min_satisfaction}")
 
-        return power, pledge
+        return power, lock
 
     def receive_reward(self, net: NetworkState, reward: float):
         # Vesting is ignored.
