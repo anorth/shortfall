@@ -11,36 +11,44 @@ class StrategyConfig:
     # The maximum total amount of onboarding to perform ever.
     # Prevents re-investment after this amount (even after power expires).
     max_power_onboard: int
-    # The maximum total tokens to pledge ever.
+    # The maximum total tokens to lock as pledge ever.
     # Prevents re-investment after this amount (even after pledge is returned).
     max_pledge_onboard: float
     # Commitment duration for onboarded power.
     commitment_duration: int
-    # Maximum tokens to lease from external party.
+    # Maximum tokens to lease from external party at any one time.
     max_pledge_lease: float
     # Whether to use a pledge shortfall (always at maximum available).
     take_shortfall: bool
 
     @staticmethod
-    def power_limited(power: int, commitment: int, shortfall: False):
-        """A strategy limited by power onboarding rather than tokens."""
+    def power_limited(power: int, duration: int, shortfall: False):
+        """
+        A strategy limited by power onboarding rather than tokens.
+        The miner will onboard the configured power, borrowing any tokens needed for pledge.
+        If shortfall is True, the miner will borrow only the minimum tokens required to lock.
+        """
         return StrategyConfig(
             max_power=power,
             max_power_onboard=power,
             max_pledge_onboard=1e18,
-            commitment_duration=commitment,
+            commitment_duration=duration,
             max_pledge_lease=1e28,
             take_shortfall=shortfall,
         )
 
     @staticmethod
-    def pledge_limited(pledge: float, commitment: int, shortfall: False):
-        """A strategy limited by pledge tokens (from balance or borrowed) rather than power."""
+    def pledge_limited(pledge: float, duration: int, shortfall: False):
+        """
+        A strategy limited by locked tokens rather than power.
+        The miner will borrow any tokens needed up to the configured pledge, and then onboard as much power as possible.
+        If shortfall is True, the miner will lock the same amount, but commit maximum allowed power.
+        """
         return StrategyConfig(
             max_power=1000 * EXBIBYTE,
             max_power_onboard=1000 * EXBIBYTE,
             max_pledge_onboard=pledge,
-            commitment_duration=commitment,
+            commitment_duration=duration,
             max_pledge_lease=1e18,
             take_shortfall=shortfall,
         )

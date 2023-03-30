@@ -2,19 +2,11 @@ import json
 import sys
 import time
 
-from consts import EXBIBYTE, DAY
+from consts import DAY
 from miner import MinerConfig
-from network import NetworkConfig
+from network import MAINNET_FEB_2023
 from sim import SimConfig, Simulator
 from strategy import StrategyConfig
-
-MAINNET_FEB_2023 = NetworkConfig(
-    epoch=0,
-    power=int(18.74 * EXBIBYTE),
-    epoch_reward=90.97,
-    circulating_supply=439_000_000.0,
-    token_lease_fee=0.20,
-)
 
 def main(args):
     # TODO: argument processing

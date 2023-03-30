@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from consts import DAY, SECTOR_SIZE, YEAR
+from consts import DAY, SECTOR_SIZE, YEAR, EXBIBYTE
 
 SUPPLY_LOCK_TARGET = 0.30
 
@@ -19,6 +19,13 @@ class NetworkConfig:
     # Fee p.a. on externally leased tokens.
     token_lease_fee: float
 
+MAINNET_FEB_2023 = NetworkConfig(
+    epoch=0,
+    power=int(18.74 * EXBIBYTE),
+    epoch_reward=90.97,
+    circulating_supply=439_000_000.0,
+    token_lease_fee=0.20,
+)
 
 @dataclass
 class NetworkState:
