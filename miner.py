@@ -1,18 +1,22 @@
 import math
-import sys
+from dataclasses import dataclass
 from typing import NamedTuple
 
 from consts import SECTOR_SIZE
 from network import NetworkState, MAX_REPAYMENT_REWARD_FRACTION, MAX_REPAYMENT_TERM, MAX_FEE_REWARD_FRACTION
+
+@dataclass
+class MinerConfig:
+    balance: float
 
 class SectorBunch(NamedTuple):
     power: int
     pledge: float
 
 class MinerState:
-    def __init__(self, balance: float):
+    def __init__(self, cfg: MinerConfig):
         self.power: int = 0
-        self.balance: float = balance
+        self.balance: float = cfg.balance
         self.lease: float = 0.0
         self.pledge_required: float = 0.0
         self.pledge_locked: float = 0.0
@@ -49,7 +53,8 @@ class MinerState:
     def available_balance(self) -> float:
         return self.balance - self.pledge_locked
 
-    def activate_sectors(self, net: NetworkState, power: int, duration: int, lock: float = float("inf")) -> (int, float):
+    def activate_sectors(self, net: NetworkState, power: int, duration: int, lock: float = float("inf")) -> (
+    int, float):
         """
         Activates power and locks a specified pledge.
         Lock may be 0, meaning to lock the minimum (after shortfall), or inf to lock the full pledge requirement.

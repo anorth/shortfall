@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from consts import SECTOR_SIZE
+from consts import SECTOR_SIZE, EXBIBYTE
 from miner import MinerState
 from network import NetworkState
 
@@ -20,6 +20,42 @@ class StrategyConfig:
     max_pledge_lease: float
     # Whether to use a pledge shortfall (always at maximum available).
     take_shortfall: bool
+
+    @staticmethod
+    def power_limited(power: int, commitment: int, shortfall: False):
+        """A strategy limited by power onboarding rather than tokens."""
+        return StrategyConfig(
+            max_power=power,
+            max_power_onboard=power,
+            max_pledge_onboard=1e18,
+            commitment_duration=commitment,
+            max_pledge_lease=1e28,
+            take_shortfall=shortfall,
+        )
+
+    @staticmethod
+    def pledge_limited(pledge: float, commitment: int, shortfall: False):
+        """A strategy limited by pledge tokens (from balance or borrowed) rather than power."""
+        return StrategyConfig(
+            max_power=1000 * EXBIBYTE,
+            max_power_onboard=1000 * EXBIBYTE,
+            max_pledge_onboard=pledge,
+            commitment_duration=commitment,
+            max_pledge_lease=1e18,
+            take_shortfall=shortfall,
+        )
+
+    @staticmethod
+    def pledge_lease_limited(lease: float, commitment: int, shortfall: False):
+        """A strategy limited by pledge tokens borrowable."""
+        return StrategyConfig(
+            max_power=1000 * EXBIBYTE,
+            max_power_onboard=1000 * EXBIBYTE,
+            max_pledge_onboard=1e18,
+            commitment_duration=commitment,
+            max_pledge_lease=lease,
+            take_shortfall=shortfall,
+        )
 
 class MinerStrategy:
     def __init__(self, cfg: StrategyConfig):

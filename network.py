@@ -11,6 +11,16 @@ MAX_REPAYMENT_REWARD_FRACTION = 0.75
 MAX_FEE_REWARD_FRACTION = 0.25
 
 @dataclass
+class NetworkConfig:
+    epoch: int
+    power: int
+    epoch_reward: float
+    circulating_supply: float
+    # Fee p.a. on externally leased tokens.
+    token_lease_fee: float
+
+
+@dataclass
 class NetworkState:
     epoch: int
     power: int
@@ -18,6 +28,14 @@ class NetworkState:
     circulating_supply: float
     epoch_reward: float
     token_lease_fee: float
+
+    def __init__(self, cfg: NetworkConfig):
+        self.epoch = cfg.epoch
+        self.power = cfg.power
+        self.power_baseline = 0 # TODO: derive baseline from network epoch instead
+        self.circulating_supply = cfg.circulating_supply
+        self.epoch_reward = cfg.epoch_reward
+        self.token_lease_fee = cfg.token_lease_fee
 
     def initial_pledge_for_power(self, power: int) -> float:
         """The initial pledge requirement for an incremental power addition."""
