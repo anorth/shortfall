@@ -1,26 +1,26 @@
 from dataclasses import dataclass
-from typing import Iterable, Dict, List
+from typing import Iterable, Dict, List, Callable
 
 from consts import DAY
 
-from miner import MinerConfig, MinerState
+from miner import BaseMinerState
 from network import NetworkConfig, NetworkState
 from strategy import StrategyConfig, MinerStrategy
 
 @dataclass
 class SimConfig:
     network: NetworkConfig
-    miner: MinerConfig
     strategy: StrategyConfig
+    miner_factory: Callable[[], BaseMinerState]
 
 class Simulator:
     """A simulator for a single miner's strategy in a network context."""
 
     def __init__(self, cfg: SimConfig):
         self.net = NetworkState(cfg.network)
-        self.miner = MinerState(cfg.miner)
         self.strategy = MinerStrategy(cfg.strategy)
         self.rewards = RewardEmitter()
+        self.miner = cfg.miner_factory()
 
     def run(self, epochs, stats_interval=1) -> Iterable[Dict]:
         """
@@ -65,6 +65,6 @@ class Simulator:
 class RewardEmitter:
     """An unrealistically smooth emission of a share of reward every epoch."""
 
-    def emit(self, net: NetworkState, m: MinerState):
+    def emit(self, net: NetworkState, m: BaseMinerState):
         share = net.epoch_reward * m.power / net.power
         m.receive_reward(net, share)

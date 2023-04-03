@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from consts import SECTOR_SIZE, EXBIBYTE
-from miner import MinerState
+from miner import BaseMinerState
 from network import NetworkState
 
 @dataclass
@@ -71,11 +71,11 @@ class MinerStrategy:
         self._onboarded = 0
         self._pledged = 0.0
 
-    def act(self, net: NetworkState, m: MinerState):
+    def act(self, net: NetworkState, m: BaseMinerState):
         available_lock = m.available_balance() + (self.cfg.max_pledge_lease - m.lease)
         available_lock = min(available_lock, self.cfg.max_pledge_onboard - self._pledged)
         if self.cfg.take_shortfall:
-            available_pledge = net.max_pledge_for_tokens(available_lock)
+            available_pledge = m.max_pledge_for_tokens(net, available_lock)
         else:
             available_pledge = available_lock
 
