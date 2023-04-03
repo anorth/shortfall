@@ -2,8 +2,10 @@ import json
 import sys
 import time
 
-import miner
 from consts import DAY, YEAR
+from miners.repay_proportional import RepayProportionalShortfallMinerState
+from miners.burn import BurnShortfallMinerState
+from miners.repay_ratchet import RepayRatchetShortfallMinerState
 from network import MAINNET_FEB_2023
 from sim import SimConfig, Simulator
 from strategy import StrategyConfig
@@ -16,8 +18,9 @@ def main(args):
     cfg = SimConfig(
         network=MAINNET_FEB_2023,
         strategy=StrategyConfig.pledge_limited(1000.0, 3 * YEAR, True),
-        miner_factory=miner.RepayShortfallMinerState.factory(balance=0),
-        # miner_factory=miner.BurnShortfallMinerState.factory(balance=0),
+        # miner_factory=RepayProportionalShortfallMinerState.factory(balance=0),
+        miner_factory=RepayRatchetShortfallMinerState.factory(balance=0),
+        # miner_factory=BurnShortfallMinerState.factory(balance=0),
     )
     sim = Simulator(cfg)
 

@@ -3,7 +3,7 @@ from typing import Iterable, Dict, List, Callable
 
 from consts import DAY
 
-from miner import BaseMinerState
+from miners.base import BaseMinerState
 from network import NetworkConfig, NetworkState
 from strategy import StrategyConfig, MinerStrategy
 
