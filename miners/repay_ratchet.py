@@ -109,8 +109,12 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
             fee_amount = reward * fee_take_rate
             self._burn_fee(fee_amount)
 
-            # Lock repayments as satisified pledge.
-            repayment_amount = min(reward * self.repayment_take_rate, self.pledge_required - self.pledge_locked)
+            # Lock repayments as satisfied pledge.
+            shortfall = self.pledge_required - self.pledge_locked
+            repayment_amount = reward * self.repayment_take_rate
+            if repayment_amount >= shortfall:
+                repayment_amount = shortfall
+                self.repayment_take_rate = 0 # Reset
             self.pledge_locked += repayment_amount
             assert fee_amount + repayment_amount <= reward
 

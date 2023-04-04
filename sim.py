@@ -29,8 +29,6 @@ class Simulator:
         """
         first_epoch = self.net.epoch
         for epoch in range(first_epoch, epochs):
-            self.net.epoch = epoch
-
             # Emit rewards according to power at start of epoch.
             self.rewards.emit(self.net, self.miner)
 
@@ -39,6 +37,7 @@ class Simulator:
 
             # Perform automatic state updates.
             self.miner.handle_epoch(self.net)
+            self.net.handle_epoch()
 
             if epoch % stats_interval == 0:
                 yield self.stats()

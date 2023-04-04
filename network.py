@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 from consts import DAY, SECTOR_SIZE, YEAR, EXBIBYTE
@@ -23,6 +24,12 @@ MAINNET_FEB_2023 = NetworkConfig(
     token_lease_fee=0.20,
 )
 
+# Reward at epoch = initial reward * (1-r)^(epochs)
+REWARD_DECAY = 1 - math.exp(math.log(1/2)/(6*YEAR))
+
+# BASELINE_INITIAL_VALUE = 2_888_888_880_000_000_000
+# BASELINE_EXPONENT = math.exp(math.log(1+2.0)/(365*2880))
+
 @dataclass
 class NetworkState:
     epoch: int
@@ -40,6 +47,10 @@ class NetworkState:
         self.epoch_reward = cfg.epoch_reward
         self.token_lease_fee = cfg.token_lease_fee
 
+    def handle_epoch(self):
+        self.epoch += 1
+        self.epoch_reward *= (1-REWARD_DECAY)
+
     def initial_pledge_for_power(self, power: int) -> float:
         """The initial pledge requirement for an incremental power addition."""
         storage = self.expected_reward_for_power(power, INITIAL_PLEDGE_PROJECTION_PERIOD)
@@ -49,8 +60,8 @@ class NetworkState:
     def power_for_initial_pledge(self, pledge: float) -> int:
         """The maximum power that can be committed for an incremental pledge."""
         # TODO: this is coupled with the simplified expected_reward_for_power
-        power = pledge * self.power / \
-                (INITIAL_PLEDGE_PROJECTION_PERIOD * self.epoch_reward + self.circulating_supply * SUPPLY_LOCK_TARGET)
+        duration = INITIAL_PLEDGE_PROJECTION_PERIOD
+        power = pledge * self.power / (duration * self.epoch_reward + self.circulating_supply * SUPPLY_LOCK_TARGET)
         return int((power // SECTOR_SIZE) * SECTOR_SIZE)
 
     def expected_reward_for_power(self, power: int, duration: int) -> float:
@@ -60,5 +71,16 @@ class NetworkState:
             return self.epoch_reward
         return duration * self.epoch_reward * power / self.power
 
+    def expected_reward_for_power2(self, power: int, duration: int) -> float:
+        """Projected rewards for some power over a period, taking reward decay into account."""
+        # SUM[EpochReward * (1-r)^x] for x in 0..duration
+        epoch_reward = self.epoch_reward * power / self.power
+        return epoch_reward * sum_over_exponential_decay(duration, REWARD_DECAY)
+
     def fee_for_token_lease(self, amount: float, duration: int) -> float:
         return amount * self.token_lease_fee * duration / YEAR
+
+
+def sum_over_exponential_decay(duration: int, decay: float) -> float:
+    # SUM[(1-r)^x] for x in 0..duration
+    return (1 - math.pow(1 - decay, duration) + decay * math.pow(1 - decay, duration)) / decay
