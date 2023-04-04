@@ -59,22 +59,19 @@ class NetworkState:
 
     def power_for_initial_pledge(self, pledge: float) -> int:
         """The maximum power that can be committed for an incremental pledge."""
-        # TODO: this is coupled with the simplified expected_reward_for_power
-        duration = INITIAL_PLEDGE_PROJECTION_PERIOD
-        power = pledge * self.power / (duration * self.epoch_reward + self.circulating_supply * SUPPLY_LOCK_TARGET)
+        rewards = self.projected_reward(self.epoch_reward, INITIAL_PLEDGE_PROJECTION_PERIOD)
+        power = pledge * self.power / (rewards + self.circulating_supply * SUPPLY_LOCK_TARGET)
         return int((power // SECTOR_SIZE) * SECTOR_SIZE)
 
     def expected_reward_for_power(self, power: int, duration: int) -> float:
-        """The projected reward that some power would earn over some period."""
-        # TODO: improve to use alpha/beta filter estimates, or something even better.
-        if self.power <= 0:
-            return self.epoch_reward
-        return duration * self.epoch_reward * power / self.power
-
-    def expected_reward_for_power2(self, power: int, duration: int) -> float:
         """Projected rewards for some power over a period, taking reward decay into account."""
-        # SUM[EpochReward * (1-r)^x] for x in 0..duration
-        epoch_reward = self.epoch_reward * power / self.power
+        # Note this doesn't use alpha/beta filter estimate or take baseline rewards into account.
+        if self.power <= 0:
+            return self.projected_reward(self.epoch_reward, duration)
+        return self.projected_reward(self.epoch_reward * power / self.power, duration)
+
+    def projected_reward(self, epoch_reward: float, duration: int) -> float:
+        """Projects a per-epoch reward into the future, taking decay into account"""
         return epoch_reward * sum_over_exponential_decay(duration, REWARD_DECAY)
 
     def fee_for_token_lease(self, amount: float, duration: int) -> float:

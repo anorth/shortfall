@@ -43,10 +43,9 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
     # Override
     def max_pledge_for_tokens(self, net: NetworkState, available_lock: float) -> float:
         """The maximum incremental initial pledge commitment allowed for an incremental locking."""
-        # TODO: this is coupled with the simplified expected_reward_for_power
         # TODO: add duration parameter = min (duration, MAX_REPAYMENT_TERM)
-        return available_lock / (1 - self.MAX_REPAYMENT_REWARD_FRACTION * self.MAX_REPAYMENT_TERM * net.epoch_reward / (
-                INITIAL_PLEDGE_PROJECTION_PERIOD * net.epoch_reward + SUPPLY_LOCK_TARGET * net.circulating_supply))
+        return available_lock / (1 - self.MAX_REPAYMENT_REWARD_FRACTION * net.projected_reward(net.epoch_reward, self.MAX_REPAYMENT_TERM) / (
+                 net.projected_reward(net.epoch_reward, INITIAL_PLEDGE_PROJECTION_PERIOD) + SUPPLY_LOCK_TARGET * net.circulating_supply))
 
     # Override
     def activate_sectors(self, net: NetworkState, power: int, duration: int, lock: float = float("inf")) -> (
@@ -73,7 +72,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         elif lock > pledge_requirement:
             lock = pledge_requirement
         elif lock < minimum_pledge:
-            raise RuntimeError(f"lock {lock} is less than minimum pledge {pledge_requirement}")
+            raise RuntimeError(f"lock {lock} is less than minimum pledge {minimum_pledge}")
         self._lease(max(lock - self.available_balance(), 0))
 
         self.power += power
@@ -130,7 +129,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         self.pledge_required -= sectors.pledge
         self.pledge_locked -= pledge_to_release
 
-    def shortfall_fraction(self, net) -> float:
+    def shortfall_fraction(self, net: NetworkState) -> float:
         """The current shortfall as a fraction of the maximum allowed."""
         max_shortfall = self.MAX_REPAYMENT_REWARD_FRACTION * net.expected_reward_for_power(self.power,
             self.MAX_REPAYMENT_TERM)
