@@ -3,7 +3,7 @@ from typing import Callable
 
 from consts import DAY, SECTOR_SIZE
 from miners.base import BaseMinerState, SectorBunch
-from network import NetworkState, INITIAL_PLEDGE_PROJECTION_PERIOD, SUPPLY_LOCK_TARGET
+from network import NetworkState, INITIAL_PLEDGE_PROJECTION_PERIOD, SUPPLY_LOCK_TARGET, BASELINE_GROWTH, REWARD_DECAY
 
 class RepayRatchetShortfallMinerState(BaseMinerState):
     """
@@ -12,10 +12,18 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
     ensuring the amount is repaid on time.
     """
 
+    # Target term for which pledge expected to be fully repaid
     MAX_REPAYMENT_TERM = 365 * DAY
+    # Max fraction of earned rewards to burn as fees
     MAX_FEE_REWARD_FRACTION = 0.25
+    # Max fraction of earned rewards to require locking as pledge
     MAX_REPAYMENT_REWARD_FRACTION = 1 - MAX_FEE_REWARD_FRACTION
-    MIN_REPAYMENT_TAKE_FRACTION = 0.25
+    # Minimum fraction of earned rewards to require locking as pledge
+    #MIN_REPAYMENT_REWARD_FRACTION = 0.25
+    # Decay rate to use for projected rewards.
+    # - REWARD_DECAY assumes constant share of power and no change in satisfaction of baseline.
+    # - REWARD_DECAY+BASELINE_GROWTH assumes this miner stops while the rest of the network grows at the baseline rate
+    REWARD_PROJECTION_DECAY=REWARD_DECAY + BASELINE_GROWTH
 
     @staticmethod
     def factory(balance: float) -> Callable[[], BaseMinerState]:
@@ -44,7 +52,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
     def max_pledge_for_tokens(self, net: NetworkState, available_lock: float) -> float:
         """The maximum incremental initial pledge commitment allowed for an incremental locking."""
         # TODO: add duration parameter = min (duration, MAX_REPAYMENT_TERM)
-        return available_lock / (1 - self.MAX_REPAYMENT_REWARD_FRACTION * net.projected_reward(net.epoch_reward, self.MAX_REPAYMENT_TERM) / (
+        return available_lock / (1 - self.MAX_REPAYMENT_REWARD_FRACTION * net.projected_reward(net.epoch_reward, self.MAX_REPAYMENT_TERM, decay=self.REWARD_PROJECTION_DECAY) / (
                  net.projected_reward(net.epoch_reward, INITIAL_PLEDGE_PROJECTION_PERIOD) + SUPPLY_LOCK_TARGET * net.circulating_supply))
 
     # Override
@@ -64,7 +72,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         # reward (e.g. from existing sectors) are sufficient to repay on time.
         # This would advantage existing SPs who could leverage their power more than new SPs.
         incremental_shortfall = self.MAX_REPAYMENT_REWARD_FRACTION * net.expected_reward_for_power(power,
-            min(duration, self.MAX_REPAYMENT_TERM))
+            min(duration, self.MAX_REPAYMENT_TERM), decay=self.REWARD_PROJECTION_DECAY)
         minimum_pledge = pledge_requirement - incremental_shortfall
 
         if lock == 0:
@@ -84,7 +92,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
 
         # Compute the repayment take from SP's current rewards needed to repay total shortfall in term.
         current_shortfall = self.pledge_required - self.pledge_locked
-        expected_rewards = net.expected_reward_for_power(self.power, self.MAX_REPAYMENT_TERM)
+        expected_rewards = net.expected_reward_for_power(self.power, self.MAX_REPAYMENT_TERM, decay=self.REWARD_PROJECTION_DECAY)
         repayment_take_rate = current_shortfall / expected_rewards
         if repayment_take_rate > self.MAX_REPAYMENT_REWARD_FRACTION:
             raise RuntimeError(f"miner computed repayment reward fraction exceeds maximum")
@@ -132,7 +140,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
     def shortfall_fraction(self, net: NetworkState) -> float:
         """The current shortfall as a fraction of the maximum allowed."""
         max_shortfall = self.MAX_REPAYMENT_REWARD_FRACTION * net.expected_reward_for_power(self.power,
-            self.MAX_REPAYMENT_TERM)
+            self.MAX_REPAYMENT_TERM, decay=self.REWARD_PROJECTION_DECAY)
         actual_shortfall = self.pledge_required - self.pledge_locked
         shortfall_frac = 0.0
         if max_shortfall > 0:

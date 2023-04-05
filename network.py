@@ -40,11 +40,10 @@ MAINNET_APR_2023 = NetworkConfig(
     token_lease_fee=0.20,
 )
 
-# Reward at epoch = initial reward * (1-r)^(epochs)
+# Reward at epoch = initial reward * (1-r)^epochs
 REWARD_DECAY = 1 - math.exp(math.log(1/2)/(6*YEAR))
-
-# BASELINE_INITIAL_VALUE = 2_888_888_880_000_000_000
-# BASELINE_EXPONENT = math.exp(math.log(1+2.0)/(365*2880))
+# Baseline at epoch = initial baseline * (1+b)^epochs
+BASELINE_GROWTH = math.exp(math.log(3)/YEAR) - 1
 
 @dataclass
 class NetworkState:
@@ -58,7 +57,7 @@ class NetworkState:
     def __init__(self, cfg: NetworkConfig):
         self.epoch = cfg.epoch
         self.power = cfg.qa_power
-        self.power_baseline = 0 # TODO: derive baseline from network epoch instead
+        self.power_baseline = cfg.baseline_power
         self.circulating_supply = cfg.circulating_supply
         self.epoch_reward = cfg.epoch_reward
         self.token_lease_fee = cfg.token_lease_fee
@@ -66,6 +65,7 @@ class NetworkState:
     def handle_epoch(self):
         self.epoch += 1
         self.epoch_reward *= (1-REWARD_DECAY)
+        self.power_baseline *= (1+BASELINE_GROWTH)
 
     def initial_pledge_for_power(self, power: int) -> float:
         """The initial pledge requirement for an incremental power addition."""
@@ -79,16 +79,16 @@ class NetworkState:
         power = pledge * self.power / (rewards + self.circulating_supply * SUPPLY_LOCK_TARGET)
         return int((power // SECTOR_SIZE) * SECTOR_SIZE)
 
-    def expected_reward_for_power(self, power: int, duration: int) -> float:
+    def expected_reward_for_power(self, power: int, duration: int, decay=REWARD_DECAY) -> float:
         """Projected rewards for some power over a period, taking reward decay into account."""
         # Note this doesn't use alpha/beta filter estimate or take baseline rewards into account.
         if self.power <= 0:
-            return self.projected_reward(self.epoch_reward, duration)
-        return self.projected_reward(self.epoch_reward * power / self.power, duration)
+            return self.projected_reward(self.epoch_reward, duration, decay)
+        return self.projected_reward(self.epoch_reward * power / self.power, duration, decay)
 
-    def projected_reward(self, epoch_reward: float, duration: int) -> float:
+    def projected_reward(self, epoch_reward: float, duration: int, decay=REWARD_DECAY) -> float:
         """Projects a per-epoch reward into the future, taking decay into account"""
-        return epoch_reward * sum_over_exponential_decay(duration, REWARD_DECAY)
+        return epoch_reward * sum_over_exponential_decay(duration, decay)
 
     def fee_for_token_lease(self, amount: float, duration: int) -> float:
         return amount * self.token_lease_fee * duration / YEAR
