@@ -6,7 +6,7 @@ from consts import DAY, YEAR
 from miners.repay_proportional import RepayProportionalShortfallMinerState
 from miners.burn import BurnShortfallMinerState
 from miners.repay_ratchet import RepayRatchetShortfallMinerState
-from network import MAINNET_FEB_2023
+import network
 from sim import SimConfig, Simulator
 from strategy import StrategyConfig
 
@@ -16,7 +16,7 @@ def main(args):
     stats_interval = DAY
 
     cfg = SimConfig(
-        network=MAINNET_FEB_2023,
+        network=network.MAINNET_APR_2023,
         strategy=StrategyConfig.pledge_limited(1000.0, 3 * YEAR, True),
         # miner_factory=RepayProportionalShortfallMinerState.factory(balance=0),
         miner_factory=RepayRatchetShortfallMinerState.factory(balance=0),

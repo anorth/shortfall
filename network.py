@@ -10,17 +10,33 @@ INITIAL_PLEDGE_PROJECTION_PERIOD = 20 * DAY
 @dataclass
 class NetworkConfig:
     epoch: int
-    power: int
+    qa_power: int
+    raw_byte_power: int
+    baseline_power: int
     epoch_reward: float
     circulating_supply: float
     # Fee p.a. on externally leased tokens.
     token_lease_fee: float
 
+# 2023-02-01, epoch 2563440
 MAINNET_FEB_2023 = NetworkConfig(
     epoch=0,
-    power=int(18.74 * EXBIBYTE),
-    epoch_reward=90.97,
-    circulating_supply=439_000_000.0,
+    qa_power=21530229500983050000,
+    raw_byte_power=16006761814138290000,
+    baseline_power=15690691297578078000,
+    epoch_reward=5*19.0057947578366,
+    circulating_supply=434191286.621853,
+    token_lease_fee=0.20,
+)
+
+# 2023-04-01, epoch 2733360
+MAINNET_APR_2023 = NetworkConfig(
+    epoch=0,
+    qa_power=22436033270683107000,
+    raw_byte_power=14846032093347054000,
+    baseline_power=17550994139680311000,
+    epoch_reward=5*16.7867382504675,
+    circulating_supply=456583469.869076,
     token_lease_fee=0.20,
 )
 
@@ -41,7 +57,7 @@ class NetworkState:
 
     def __init__(self, cfg: NetworkConfig):
         self.epoch = cfg.epoch
-        self.power = cfg.power
+        self.power = cfg.qa_power
         self.power_baseline = 0 # TODO: derive baseline from network epoch instead
         self.circulating_supply = cfg.circulating_supply
         self.epoch_reward = cfg.epoch_reward

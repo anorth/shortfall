@@ -13,8 +13,8 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
     """
 
     MAX_REPAYMENT_TERM = 365 * DAY
-    MAX_REPAYMENT_REWARD_FRACTION = 0.75
     MAX_FEE_REWARD_FRACTION = 0.25
+    MAX_REPAYMENT_REWARD_FRACTION = 1 - MAX_FEE_REWARD_FRACTION
     MIN_REPAYMENT_TAKE_FRACTION = 0.25
 
     @staticmethod
