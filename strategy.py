@@ -75,7 +75,7 @@ class MinerStrategy:
         available_lock = m.available_balance() + (self.cfg.max_pledge_lease - m.lease)
         available_lock = min(available_lock, self.cfg.max_pledge_onboard - self._pledged)
         if self.cfg.take_shortfall:
-            available_pledge = m.max_pledge_for_tokens(net, available_lock)
+            available_pledge = m.max_pledge_for_tokens(net, available_lock, self.cfg.commitment_duration)
         else:
             available_pledge = available_lock
 

@@ -39,7 +39,7 @@ class RepayProportionalShortfallMinerState(BaseMinerState):
         return summary
 
     # Override
-    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float) -> float:
+    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float, duration: int) -> float:
         """The maximum incremental initial pledge commitment allowed for an incremental locking."""
         # TODO: add duration parameter = min (duration, MAX_REPAYMENT_TERM)
         return available_lock / (1 - self.MAX_REPAYMENT_REWARD_FRACTION * net.projected_reward(net.epoch_reward, self.MAX_REPAYMENT_TERM) / (

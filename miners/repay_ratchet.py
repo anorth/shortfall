@@ -12,18 +12,16 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
     ensuring the amount is repaid on time.
     """
 
-    # Target term for which pledge expected to be fully repaid
-    MAX_REPAYMENT_TERM = 365 * DAY
+    # Maximum target term for which pledge expected to be fully repaid (if longer than commitment duration)
+    MAX_REPAYMENT_TERM = 3 * 365 * DAY
     # Max fraction of earned rewards to burn as fees
     MAX_FEE_REWARD_FRACTION = 0.25
     # Max fraction of earned rewards to require locking as pledge
     MAX_REPAYMENT_REWARD_FRACTION = 1 - MAX_FEE_REWARD_FRACTION
-    # Minimum fraction of earned rewards to require locking as pledge
-    #MIN_REPAYMENT_REWARD_FRACTION = 0.25
     # Decay rate to use for projected rewards.
     # - REWARD_DECAY assumes constant share of power and no change in satisfaction of baseline.
     # - REWARD_DECAY+BASELINE_GROWTH assumes this miner stops while the rest of the network grows at the baseline rate
-    REWARD_PROJECTION_DECAY=REWARD_DECAY + BASELINE_GROWTH
+    REWARD_PROJECTION_DECAY = REWARD_DECAY + BASELINE_GROWTH
 
     @staticmethod
     def factory(balance: float) -> Callable[[], BaseMinerState]:
@@ -49,11 +47,14 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         return summary
 
     # Override
-    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float) -> float:
+    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float, duration: int) -> float:
         """The maximum incremental initial pledge commitment allowed for an incremental locking."""
-        # TODO: add duration parameter = min (duration, MAX_REPAYMENT_TERM)
-        return available_lock / (1 - self.MAX_REPAYMENT_REWARD_FRACTION * net.projected_reward(net.epoch_reward, self.MAX_REPAYMENT_TERM, decay=self.REWARD_PROJECTION_DECAY) / (
-                 net.projected_reward(net.epoch_reward, INITIAL_PLEDGE_PROJECTION_PERIOD) + SUPPLY_LOCK_TARGET * net.circulating_supply))
+        duration = min(duration, self.MAX_REPAYMENT_TERM)
+        return available_lock / \
+            (1 - self.MAX_REPAYMENT_REWARD_FRACTION * net.projected_reward(net.epoch_reward, duration,
+                decay=self.REWARD_PROJECTION_DECAY) /
+             (net.projected_reward(net.epoch_reward,
+                 INITIAL_PLEDGE_PROJECTION_PERIOD) + SUPPLY_LOCK_TARGET * net.circulating_supply))
 
     # Override
     def activate_sectors(self, net: NetworkState, power: int, duration: int, lock: float = float("inf")) -> (
@@ -71,8 +72,8 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         # We could just set a fixed parameter like 50%, and only constrain that the miner's total
         # reward (e.g. from existing sectors) are sufficient to repay on time.
         # This would advantage existing SPs who could leverage their power more than new SPs.
-        incremental_shortfall = self.MAX_REPAYMENT_REWARD_FRACTION * net.expected_reward_for_power(power,
-            min(duration, self.MAX_REPAYMENT_TERM), decay=self.REWARD_PROJECTION_DECAY)
+        incremental_shortfall = self.MAX_REPAYMENT_REWARD_FRACTION * net.expected_reward_for_power(
+            power, min(duration, self.MAX_REPAYMENT_TERM), decay=self.REWARD_PROJECTION_DECAY)
         minimum_pledge = pledge_requirement - incremental_shortfall
 
         if lock == 0:
@@ -91,13 +92,17 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         self._expirations.setdefault(expiration, []).append(SectorBunch(power, pledge_requirement))
 
         # Compute the repayment take from SP's current rewards needed to repay total shortfall in term.
-        current_shortfall = self.pledge_required - self.pledge_locked
-        expected_rewards = net.expected_reward_for_power(self.power, self.MAX_REPAYMENT_TERM, decay=self.REWARD_PROJECTION_DECAY)
-        repayment_take_rate = current_shortfall / expected_rewards
-        if repayment_take_rate > self.MAX_REPAYMENT_REWARD_FRACTION:
-            raise RuntimeError(f"miner computed repayment reward fraction exceeds maximum")
-        # Ratchet repayment take up if necessary.
-        self.repayment_take_rate = max(self.repayment_take_rate, repayment_take_rate)
+        # Repayment take depends on shortest duration, so only update if this new sector actually took a shortfall.
+        # This allows SP to onboard shorter sectors with full pledge without pessimistically increasing repayments.
+        if lock < pledge_requirement:
+            current_shortfall = self.pledge_required - self.pledge_locked
+            expected_rewards = net.expected_reward_for_power(self.power, self.MAX_REPAYMENT_TERM,
+                decay=self.REWARD_PROJECTION_DECAY)
+            repayment_take_rate = current_shortfall / expected_rewards
+            if repayment_take_rate > self.MAX_REPAYMENT_REWARD_FRACTION:
+                raise RuntimeError(f"miner computed repayment reward fraction exceeds maximum")
+            # Ratchet repayment take up if necessary.
+            self.repayment_take_rate = max(self.repayment_take_rate, repayment_take_rate)
 
         return power, lock
 
@@ -121,7 +126,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
             repayment_amount = reward * self.repayment_take_rate
             if repayment_amount >= shortfall:
                 repayment_amount = shortfall
-                self.repayment_take_rate = 0 # Reset
+                self.repayment_take_rate = 0  # Reset
             self.pledge_locked += repayment_amount
             assert fee_amount + repayment_amount <= reward
 

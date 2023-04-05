@@ -41,7 +41,7 @@ class BaseMinerState:
     def available_balance(self) -> float:
         return self.balance - self.pledge_locked
 
-    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float) -> float:
+    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float, duration: int) -> float:
         """The maximum incremental initial pledge commitment allowed for an incremental locking."""
         return available_lock
 

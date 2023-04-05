@@ -7,6 +7,12 @@ SUPPLY_LOCK_TARGET = 0.30
 
 INITIAL_PLEDGE_PROJECTION_PERIOD = 20 * DAY
 
+# Reward at epoch = initial reward * (1-r)^epochs
+REWARD_DECAY = 1 - math.exp(math.log(1/2)/(6*YEAR))
+# Baseline at epoch = initial baseline * (1+b)^epochs
+BASELINE_GROWTH = math.exp(math.log(3)/YEAR) - 1
+
+
 @dataclass
 class NetworkConfig:
     epoch: int
@@ -14,6 +20,7 @@ class NetworkConfig:
     raw_byte_power: int
     baseline_power: int
     epoch_reward: float
+    reward_decay: float
     circulating_supply: float
     # Fee p.a. on externally leased tokens.
     token_lease_fee: float
@@ -25,6 +32,7 @@ MAINNET_FEB_2023 = NetworkConfig(
     raw_byte_power=16006761814138290000,
     baseline_power=15690691297578078000,
     epoch_reward=5*19.0057947578366,
+    reward_decay=REWARD_DECAY,
     circulating_supply=434191286.621853,
     token_lease_fee=0.20,
 )
@@ -36,14 +44,10 @@ MAINNET_APR_2023 = NetworkConfig(
     raw_byte_power=14846032093347054000,
     baseline_power=17550994139680311000,
     epoch_reward=5*16.7867382504675,
+    reward_decay=REWARD_DECAY,
     circulating_supply=456583469.869076,
     token_lease_fee=0.20,
 )
-
-# Reward at epoch = initial reward * (1-r)^epochs
-REWARD_DECAY = 1 - math.exp(math.log(1/2)/(6*YEAR))
-# Baseline at epoch = initial baseline * (1+b)^epochs
-BASELINE_GROWTH = math.exp(math.log(3)/YEAR) - 1
 
 @dataclass
 class NetworkState:
@@ -52,6 +56,7 @@ class NetworkState:
     power_baseline: int
     circulating_supply: float
     epoch_reward: float
+    reward_decay: float
     token_lease_fee: float
 
     def __init__(self, cfg: NetworkConfig):
@@ -60,11 +65,12 @@ class NetworkState:
         self.power_baseline = cfg.baseline_power
         self.circulating_supply = cfg.circulating_supply
         self.epoch_reward = cfg.epoch_reward
+        self.reward_decay = cfg.reward_decay
         self.token_lease_fee = cfg.token_lease_fee
 
     def handle_epoch(self):
         self.epoch += 1
-        self.epoch_reward *= (1-REWARD_DECAY)
+        self.epoch_reward *= (1-self.reward_decay)
         self.power_baseline *= (1+BASELINE_GROWTH)
 
     def initial_pledge_for_power(self, power: int) -> float:
