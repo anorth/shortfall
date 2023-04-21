@@ -1,8 +1,8 @@
 from collections import defaultdict
 from typing import NamedTuple
 
-from consts import SECTOR_SIZE
-from network import NetworkState
+from ..consts import SECTOR_SIZE
+from ..network import NetworkState
 
 
 class SectorBunch(NamedTuple):

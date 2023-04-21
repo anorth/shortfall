@@ -1,8 +1,8 @@
 from typing import Callable
 
-from consts import SECTOR_SIZE
-from miners.base import BaseMinerState, SectorBunch
-from network import NetworkState
+from ..consts import SECTOR_SIZE
+from ..miners.base import BaseMinerState, SectorBunch
+from ..network import NetworkState
 
 
 class BurnShortfallMinerState(BaseMinerState):

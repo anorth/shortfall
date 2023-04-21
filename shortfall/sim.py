@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import Iterable, Dict, List, Callable
 
-from consts import DAY
+from .consts import DAY
 
-from miners.base import BaseMinerState
-from network import NetworkConfig, NetworkState
-from strategy import StrategyConfig, MinerStrategy
+from .miners.base import BaseMinerState
+from .network import NetworkConfig, NetworkState
+from .strategy import StrategyConfig, MinerStrategy
 
 @dataclass
 class SimConfig:

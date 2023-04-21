@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass
 
-from consts import DAY, SECTOR_SIZE, YEAR, EXBIBYTE
+from .consts import DAY, SECTOR_SIZE, YEAR
 
 SUPPLY_LOCK_TARGET = 0.30
 

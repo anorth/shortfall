@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from consts import SECTOR_SIZE, EXBIBYTE
-from miners.base import BaseMinerState
-from network import NetworkState
+from .consts import SECTOR_SIZE, EXBIBYTE
+from .miners.base import BaseMinerState
+from .network import NetworkState
 
 @dataclass
 class StrategyConfig:
