@@ -7,7 +7,7 @@ from network import NetworkState
 class BurnShortfallMinerState(BaseMinerState):
     """A miner that burns an equivalent amount to the shortfall, but never pledges it."""
 
-    MAX_SHORTFALL_FRACTION = 0.50
+    MAX_SHORTFALL_FRACTION = 0.33  # Likely in the range 25-50%.
 
     @staticmethod
     def factory(balance: float) -> Callable[[], BaseMinerState]:
@@ -16,6 +16,7 @@ class BurnShortfallMinerState(BaseMinerState):
 
     def __init__(self, balance: float):
         super().__init__(balance)
+        # Amount of burn obligation not yet paid.
         self.fee_pending: float = 0
 
     def summary(self, rounding=4):
@@ -28,7 +29,7 @@ class BurnShortfallMinerState(BaseMinerState):
     # Override
     def max_pledge_for_tokens(self, net: NetworkState, available_lock: float, duration: int) -> float:
         """The maximum incremental initial pledge commitment allowed for an incremental locking."""
-        return available_lock / self.MAX_SHORTFALL_FRACTION
+        return available_lock / (1 - self.MAX_SHORTFALL_FRACTION)
 
     # Overrides
     def activate_sectors(self, net: NetworkState, power: int, duration: int, lock: float = float("inf")) -> (
@@ -53,8 +54,10 @@ class BurnShortfallMinerState(BaseMinerState):
         self._lease(max(lock - self.available_balance(), 0))
 
         self.power += power
-        self.pledge_locked += lock  # Only the initially locked amount is ever required to be pledged
-        self.fee_pending += pledge_requirement - lock  # Pending fee captures the difference to the notional initial pledge
+        # Only the initially locked amount is ever required to be pledged.
+        self.pledge_locked += lock
+        # Captures the shortfall from the notional initial pledge.
+        self.fee_pending += pledge_requirement - lock
 
         expiration = net.epoch + duration
         self._expirations.setdefault(expiration, []).append(SectorBunch(power, lock))
@@ -68,10 +71,15 @@ class BurnShortfallMinerState(BaseMinerState):
 
         # Calculate and burn shortfall fee
         if self.fee_pending > 0:
+            # Approximate original pledge requirement as true pledge plus outstanding shortfall.
+            # This starts off correct, but then underestimates as the shortfall is paid off,
+            # resulting in a higher payoff rate than if the original pledge intention were
+            # accounted explicitly.
             collateral_target = self.pledge_locked + self.fee_pending
-            collateral_pct = self.pledge_locked / collateral_target
-            available_pct = collateral_pct * collateral_pct
-            fee_take_rate = 1 - available_pct
+            shortfall_fraction = self.fee_pending / collateral_target
+
+            BASE_BURN_RATE = 0.01
+            fee_take_rate = BASE_BURN_RATE + shortfall_fraction ** 0.75
             assert fee_take_rate >= 0
             assert fee_take_rate <= 1.0
             if fee_take_rate > 0:
@@ -84,7 +92,7 @@ class BurnShortfallMinerState(BaseMinerState):
         self._repay(min(self.lease, self.available_balance()))
 
     def handle_expiration(self, sectors: SectorBunch):
-        # Reduce the outstanding fee in proportion to the power represented.
+        # Reduce (forgive) the outstanding fee in proportion to the power represented.
         # XXX it's not clear that this is appropriate policy.
         remaining_power_frac = (self.power - sectors.power) / self.power
         self.fee_pending *= remaining_power_frac

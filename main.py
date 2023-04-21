@@ -15,8 +15,8 @@ def main(args):
     epochs = 3 * YEAR + 1
     stats_interval = DAY
 
-    # miner_factory=RepayProportionalShortfallMinerState.factory(balance=0),
-    # miner_factory=BurnShortfallMinerState.factory(balance=0),
+    # miner_factory=RepayProportionalShortfallMinerState.factory(balance=0)
+    # miner_factory=BurnShortfallMinerState.factory(balance=0)
     miner_factory = RepayRatchetShortfallMinerState.factory(
         balance=0,
         max_repayment_term=3 * YEAR,
