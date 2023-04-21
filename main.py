@@ -3,7 +3,6 @@ import sys
 import time
 
 from consts import DAY, YEAR
-from miners.repay_proportional import RepayProportionalShortfallMinerState
 from miners.burn import BurnShortfallMinerState
 from miners.repay_ratchet import RepayRatchetShortfallMinerState
 from network import *
@@ -15,7 +14,6 @@ def main(args):
     epochs = 3 * YEAR + 1
     stats_interval = DAY
 
-    # miner_factory=RepayProportionalShortfallMinerState.factory(balance=0)
     # miner_factory=BurnShortfallMinerState.factory(balance=0)
     miner_factory = RepayRatchetShortfallMinerState.factory(
         balance=0,
