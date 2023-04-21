@@ -4,18 +4,31 @@ from consts import SECTOR_SIZE
 from miners.base import BaseMinerState, SectorBunch
 from network import NetworkState
 
+
 class BurnShortfallMinerState(BaseMinerState):
     """A miner that burns an equivalent amount to the shortfall, but never pledges it."""
 
-    MAX_SHORTFALL_FRACTION = 0.33  # Likely in the range 25-50%.
+    # The maximum shortfall as a fraction of nominal pledge requirement.
+    DEFAULT_MAX_SHORTFALL_FRACTION = 0.33  # Likely in the range 25-50%.
+    # Exponent of the current shortfall fraction determining the take rate from rewards.
+    DEFAULT_SHORTFALL_TAKE_RATE_EXPONENT = 0.75
 
     @staticmethod
-    def factory(balance: float) -> Callable[[], BaseMinerState]:
+    def factory(balance: float,
+            max_shortfall_fraction: float = DEFAULT_MAX_SHORTFALL_FRACTION,
+            shortfall_take_rate_exponent: float = DEFAULT_SHORTFALL_TAKE_RATE_EXPONENT,
+    ) -> Callable[[], BaseMinerState]:
         """Returns a function that creates new miner states."""
-        return lambda: BurnShortfallMinerState(balance=balance)
+        return lambda: BurnShortfallMinerState(balance=balance,
+            max_shortfall_fraction=max_shortfall_fraction,
+            shortfall_take_rate_exponent=shortfall_take_rate_exponent)
 
-    def __init__(self, balance: float):
+    def __init__(self, balance: float,
+            max_shortfall_fraction: float = DEFAULT_MAX_SHORTFALL_FRACTION,
+            shortfall_take_rate_exponent: float = DEFAULT_SHORTFALL_TAKE_RATE_EXPONENT):
         super().__init__(balance)
+        self.max_shortfall_fraction = max_shortfall_fraction
+        self.shortfall_take_rate_exponent = shortfall_take_rate_exponent
         # Amount of burn obligation not yet paid.
         self.fee_pending: float = 0
 
@@ -27,12 +40,14 @@ class BurnShortfallMinerState(BaseMinerState):
         return summary
 
     # Override
-    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float, duration: int) -> float:
+    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float,
+            duration: int) -> float:
         """The maximum incremental initial pledge commitment allowed for an incremental locking."""
-        return available_lock / (1 - self.MAX_SHORTFALL_FRACTION)
+        return available_lock / (1 - self.max_shortfall_fraction)
 
     # Overrides
-    def activate_sectors(self, net: NetworkState, power: int, duration: int, lock: float = float("inf")) -> (
+    def activate_sectors(self, net: NetworkState, power: int, duration: int,
+            lock: float = float("inf")) -> (
             int, float):
         """
         Activates power and locks a specified pledge.
@@ -43,7 +58,7 @@ class BurnShortfallMinerState(BaseMinerState):
         assert power % SECTOR_SIZE == 0
 
         pledge_requirement = net.initial_pledge_for_power(power)
-        minimum_pledge = pledge_requirement * (1 - self.MAX_SHORTFALL_FRACTION)
+        minimum_pledge = pledge_requirement * (1 - self.max_shortfall_fraction)
 
         if lock == 0:
             lock = minimum_pledge
@@ -79,7 +94,7 @@ class BurnShortfallMinerState(BaseMinerState):
             shortfall_fraction = self.fee_pending / collateral_target
 
             BASE_BURN_RATE = 0.01
-            fee_take_rate = BASE_BURN_RATE + shortfall_fraction ** 0.75
+            fee_take_rate = BASE_BURN_RATE + shortfall_fraction ** self.shortfall_take_rate_exponent
             assert fee_take_rate >= 0
             assert fee_take_rate <= 1.0
             if fee_take_rate > 0:

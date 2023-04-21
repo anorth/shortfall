@@ -1,11 +1,14 @@
+from collections import defaultdict
 from typing import NamedTuple
 
 from consts import SECTOR_SIZE
 from network import NetworkState
 
+
 class SectorBunch(NamedTuple):
     power: int
     pledge: float
+
 
 class BaseMinerState:
     """Miner with leased tokens but no pledge shortfall behaviour."""
@@ -21,7 +24,12 @@ class BaseMinerState:
         self.lease_fee_accrued = 0.0
 
         # Scheduled expiration of power, by epoch.
-        self._expirations: dict[int, list[SectorBunch]] = {}
+        self._expirations: dict[int, list[SectorBunch]] = defaultdict(list[SectorBunch])
+
+    @staticmethod
+    def factory(balance: float):
+        """Returns a function that creates new miner states."""
+        return lambda: BaseMinerState(balance=balance)
 
     def summary(self, rounding=4):
         net_equity = self.balance - self.lease
@@ -41,11 +49,13 @@ class BaseMinerState:
     def available_balance(self) -> float:
         return self.balance - self.pledge_locked
 
-    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float, duration: int) -> float:
+    def max_pledge_for_tokens(self, net: NetworkState, available_lock: float,
+            duration: int) -> float:
         """The maximum incremental initial pledge commitment allowed for an incremental locking."""
         return available_lock
 
-    def activate_sectors(self, net: NetworkState, power: int, duration: int, lock: float = float("inf")) -> (
+    def activate_sectors(self, net: NetworkState, power: int, duration: int,
+            lock: float = float("inf")) -> (
             int, float):
         """
         Activates power and locks a specified pledge.
@@ -66,7 +76,7 @@ class BaseMinerState:
         self.power += power
         self.pledge_locked += lock
         expiration = net.epoch + duration
-        self._expirations.setdefault(expiration, []).append(SectorBunch(power, pledge_requirement))
+        self._expirations[expiration].append(SectorBunch(power, pledge_requirement))
 
         return power, lock
 
@@ -120,4 +130,3 @@ class BaseMinerState:
         assert v >= 0
         self.lease += v
         self.lease_fee_accrued += v
-

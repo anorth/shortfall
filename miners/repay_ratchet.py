@@ -109,7 +109,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         self.pledge_locked += lock
 
         expiration = net.epoch + duration
-        self._expirations.setdefault(expiration, []).append(SectorBunch(power, pledge_requirement))
+        self._expirations[expiration].append(SectorBunch(power, pledge_requirement))
 
         # Compute the repayment take from SP's current rewards needed to repay total shortfall in term.
         # Repayment take depends on shortest duration, so only update if this new sector actually took a shortfall.
