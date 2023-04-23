@@ -94,7 +94,8 @@ class BurnShortfallMinerState(BaseMinerState):
             shortfall_fraction = self.fee_pending / collateral_target
 
             BASE_BURN_RATE = 0.01
-            fee_take_rate = BASE_BURN_RATE + shortfall_fraction ** self.shortfall_take_rate_exponent
+            fee_take_rate = min(
+                BASE_BURN_RATE + shortfall_fraction ** self.shortfall_take_rate_exponent, 1.0)
             assert fee_take_rate >= 0
             assert fee_take_rate <= 1.0
             if fee_take_rate > 0:

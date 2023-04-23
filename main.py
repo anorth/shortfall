@@ -2,6 +2,7 @@ import json
 import sys
 import time
 
+from shortfall.miners.burn import BurnShortfallMinerState
 from shortfall.miners.repay_ratchet import RepayRatchetShortfallMinerState
 from shortfall.network import *
 from shortfall.sim import SimConfig, Simulator
