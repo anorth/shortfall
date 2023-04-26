@@ -54,6 +54,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
 
     def summary(self, rounding=4):
         shortfall = self.pledge_required - self.pledge_locked
+        # Shortfall as a fraction of pledge required for the sectors committed.
         shortfall_pct = 0
         if self.pledge_required > 0:
             shortfall_pct = round(100 * shortfall / self.pledge_required, 2)
@@ -67,7 +68,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
 
     # Override
     def max_pledge_for_tokens(self, net: NetworkState, available_lock: float, duration: int) -> float:
-        """The maximum incremental initial pledge commitment allowed for an incremental locking."""
+        """The maximum nominal initial pledge commitment allowed for an incremental locking."""
         duration = min(duration, self._max_repayment_term)
         return available_lock / \
             (1 - self._max_repayment_reward_fraction * net.projected_reward(net.epoch_reward, duration,

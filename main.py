@@ -2,6 +2,7 @@ import json
 import sys
 import time
 
+from shortfall.consts import TIBIBYTE
 from shortfall.miners.burn import BurnShortfallMinerState
 from shortfall.miners.repay_ratchet import RepayRatchetShortfallMinerState
 from shortfall.network import *
@@ -22,7 +23,8 @@ def main(args):
     )
     cfg = SimConfig(
         network=MAINNET_APR_2023,
-        strategy=StrategyConfig.pledge_limited(1000.0, 3 * YEAR, True),
+        strategy=StrategyConfig.pledge_limited(1000.0, 3 * YEAR, shortfall=1.0),
+        # strategy=StrategyConfig.power_limited(100 * TIBIBYTE, 3 * YEAR, shortfall=1.0),
         miner_factory=miner_factory,
     )
     sim = Simulator(cfg)
@@ -31,6 +33,7 @@ def main(args):
     stats = sim.run_all(epochs, stats_interval)
     end_time = time.perf_counter()
 
+    print(cfg.strategy)
     for s in stats:
         print(json.dumps(s))
     latency = end_time - start_time

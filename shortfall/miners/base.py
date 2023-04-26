@@ -51,7 +51,7 @@ class BaseMinerState:
 
     def max_pledge_for_tokens(self, net: NetworkState, available_lock: float,
             duration: int) -> float:
-        """The maximum incremental initial pledge commitment allowed for an incremental locking."""
+        """The maximum nominal initial pledge commitment allowed for an incremental locking."""
         return available_lock
 
     def activate_sectors(self, net: NetworkState, power: int, duration: int,

@@ -80,7 +80,7 @@ class NetworkState:
         return storage + consensus
 
     def power_for_initial_pledge(self, pledge: float) -> int:
-        """The maximum power that can be committed for an incremental pledge."""
+        """The maximum power that can be committed for an incremental nominal pledge."""
         rewards = self.projected_reward(self.epoch_reward, INITIAL_PLEDGE_PROJECTION_PERIOD)
         power = pledge * self.power / (rewards + self.circulating_supply * SUPPLY_LOCK_TARGET)
         return int((power // SECTOR_SIZE) * SECTOR_SIZE)

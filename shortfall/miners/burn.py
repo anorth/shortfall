@@ -34,15 +34,23 @@ class BurnShortfallMinerState(BaseMinerState):
 
     def summary(self, rounding=4):
         summary = super().summary(rounding)
+        # Outstanding obligation as a fraction of pledge locked plus obligation.
+        # Note that as it's repaid, this denominator becomes smaller than the
+        # initial nominal pledge requirement.
+        shortfall_pct = 0
+        if self.fee_pending > 0:
+            shortfall_pct = round(100 * self.fee_pending / (self.pledge_locked + self.fee_pending),
+                2)
         summary.update({
             'fee_pending': round(self.fee_pending, rounding),
+            'shortfall_pct': shortfall_pct,
         })
         return summary
 
     # Override
     def max_pledge_for_tokens(self, net: NetworkState, available_lock: float,
             duration: int) -> float:
-        """The maximum incremental initial pledge commitment allowed for an incremental locking."""
+        """The maximum nominal initial pledge commitment allowed for an incremental locking."""
         return available_lock / (1 - self.max_shortfall_fraction)
 
     # Overrides
