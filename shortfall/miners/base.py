@@ -22,6 +22,8 @@ class BaseMinerState:
         self.reward_earned: float = 0.0
         self.fee_burned: float = 0.0
         self.lease_fee_accrued = 0.0
+        self.epochs: int = 0
+        self.pledge_epochs: float = 0.0
 
         # Scheduled expiration of power, by epoch.
         self._expirations: dict[int, list[SectorBunch]] = defaultdict(list[SectorBunch])
@@ -33,6 +35,9 @@ class BaseMinerState:
 
     def summary(self, rounding=4):
         net_equity = self.balance - self.lease
+        # Time-weighted total return on pledge
+        fofr = (self.reward_earned - self.fee_burned - self.lease_fee_accrued) / \
+               (self.pledge_epochs / self.epochs)
         return {
             'power': self.power,
             'balance': round(self.balance, rounding),
@@ -40,6 +45,7 @@ class BaseMinerState:
             'pledge_locked': round(self.pledge_locked, rounding),
             'available': round(self.available_balance(), rounding),
             'net_equity': round(net_equity, rounding),
+            'fofr': round(fofr, rounding),
 
             'reward_earned': round(self.reward_earned, rounding),
             'fee_burned': round(self.fee_burned, rounding),
@@ -93,6 +99,10 @@ class BaseMinerState:
         # The fee is added to the repayment obligation. If the miner has funds, it will pay it next epoch.
         fee = net.fee_for_token_lease(self.lease, 1)
         self._accrue_lease_fee(fee)
+
+        # Accumulate pledge epochs (for return-on-pledge calculation).
+        self.epochs += 1
+        self.pledge_epochs += self.pledge_locked
 
         # Expire power.
         expiring_now = self._expirations.pop(net.epoch, [])
