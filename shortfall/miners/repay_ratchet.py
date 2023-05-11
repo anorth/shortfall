@@ -12,7 +12,7 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
     """
 
     # See comments in __init__.
-    DEFAULT_MAX_REPAYMENT_TERM = 3 * 365 * DAY
+    DEFAULT_MAX_REPAYMENT_TERM = 5 * 365 * DAY
     DEFAULT_MAX_FEE_REWARD_FRACTION = 0.25
     DEFAULT_REWARD_PROJECTION_DECAY = REWARD_DECAY + BASELINE_GROWTH
 
@@ -128,8 +128,8 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
 
     # Override
     def receive_reward(self, net: NetworkState, reward: float):
-        # Vesting is ignored.
         self._earn_reward(reward)
+        available = self._vest_reward(net.epoch, reward)
 
         # Calculate shortfall rate as parameter to repayment and fee.
         assert self._max_fee_reward_fraction + self._max_repayment_reward_fraction <= 1.0
@@ -138,17 +138,11 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         if shortfall_frac > 0:
             # Burn the fee
             fee_take_rate = shortfall_frac * self._max_fee_reward_fraction
-            fee_amount = reward * fee_take_rate
+            # Take min with available reward to avoid rounding errors causing fee to exceed available.
+            # TODO: burn fee from vesting rewards if it exceeds available balance
+            # (which can happen if max fee reward fraction is > 0.25).
+            fee_amount = min(available, reward * fee_take_rate)
             self._burn_fee(fee_amount)
-
-            # Lock repayments as satisfied pledge.
-            shortfall = self.pledge_required - self.pledge_locked
-            repayment_amount = reward * self.repayment_take_rate
-            if repayment_amount >= shortfall:
-                repayment_amount = shortfall
-                self.repayment_take_rate = 0  # Reset
-            self.pledge_locked += repayment_amount
-            assert fee_amount + repayment_amount <= reward
 
         # Repay lease if possible.
         self._repay(min(self.lease, self.available_balance()))
@@ -161,6 +155,21 @@ class RepayRatchetShortfallMinerState(BaseMinerState):
         self.power -= sectors.power
         self.pledge_required -= sectors.pledge
         self.pledge_locked -= pledge_to_release
+
+    # Override
+    def handle_vest(self, vested: float):
+        super().handle_vest(vested)
+        # Lock vested rewards as satisfied pledge.
+        shortfall = self.pledge_required - self.pledge_locked
+        # Calculate take rate as fraction of vesting rewards (rather than all earned rewards)
+        # TODO: probably simpler to set self.repayment_take_rate to this value in the first place
+        vesting_take_rate = self.repayment_take_rate / 0.75
+        repayment_amount = vested * vesting_take_rate
+        if repayment_amount >= shortfall:
+            repayment_amount = shortfall
+            self.repayment_take_rate = 0  # Reset
+        self.pledge_locked += repayment_amount
+        assert self.available_balance() >= 0
 
     def shortfall_fraction(self, net: NetworkState) -> float:
         """The current shortfall as a fraction of the maximum allowed."""

@@ -10,6 +10,15 @@ class SectorBunch(NamedTuple):
     pledge: float
 
 
+# Fraction of earned rewards that are immediately available
+AVAILABLE_REWARD_SHARE = 0.25
+# Fraction of earned rewards that vest
+VEST_REWARD_SHARE = 1 - AVAILABLE_REWARD_SHARE
+# Interval between vesting chunks
+VESTING_INTERVAL = 2800
+# Number of intervals over which vesting occurs
+VESTING_PERIOD_INTERVALS = 180
+
 class BaseMinerState:
     """Miner with leased tokens but no pledge shortfall behaviour."""
 
@@ -18,6 +27,8 @@ class BaseMinerState:
         self.balance: float = balance
         self.lease: float = 0.0
         self.pledge_locked: float = 0.0
+        self.vesting_locked: float = 0.0
+        self.vesting_table: dict[int, float] = defaultdict(float)
 
         self.reward_earned: float = 0.0
         self.fee_burned: float = 0.0
@@ -43,6 +54,7 @@ class BaseMinerState:
             'balance': round(self.balance, rounding),
             'lease': round(self.lease, rounding),
             'pledge_locked': round(self.pledge_locked, rounding),
+            'vesting_locked': round(self.vesting_locked, rounding),
             'available': round(self.available_balance(), rounding),
             'net_equity': round(net_equity, rounding),
             'fofr': round(fofr, rounding),
@@ -53,7 +65,7 @@ class BaseMinerState:
         }
 
     def available_balance(self) -> float:
-        return self.balance - self.pledge_locked
+        return self.balance - (self.pledge_locked + self.vesting_locked)
 
     def max_pledge_for_tokens(self, net: NetworkState, available_lock: float,
             duration: int) -> float:
@@ -87,14 +99,14 @@ class BaseMinerState:
         return power, lock
 
     def receive_reward(self, net: NetworkState, reward: float):
-        # Vesting is ignored.
         self._earn_reward(reward)
+        self._vest_reward(net.epoch, reward)
 
         # Repay lease if possible.
         self._repay(min(self.lease, self.available_balance()))
 
     def handle_epoch(self, net: NetworkState):
-        """Executes end-of-epoch state updates"""
+        """Executes end-of-epoch state updates."""
         # Accrue token lease fees.
         # The fee is added to the repayment obligation. If the miner has funds, it will pay it next epoch.
         fee = net.fee_for_token_lease(self.lease, 1)
@@ -109,14 +121,41 @@ class BaseMinerState:
         for sb in expiring_now:
             self.handle_expiration(sb)
 
+        # Vest rewards
+        vesting_now = self.vesting_table.pop(net.epoch, 0.0)
+        if vesting_now > 0.0:
+            self.handle_vest(vesting_now)
+
     def handle_expiration(self, sectors: SectorBunch):
         self.power -= sectors.power
         self.pledge_locked -= sectors.pledge
 
+    def handle_vest(self, vested: float):
+        """Accounts for earned rewards vesting."""
+        self.vesting_locked -= vested
+
     def _earn_reward(self, v: float):
+        """Accounts for earned reward."""
         assert v >= 0
         self.balance += v
         self.reward_earned += v
+
+    def _vest_reward(self, epoch: int, v: float) -> float:
+        """Locks part of an already-earned reward for vesting. Returns the immediately available amount."""
+        assert v >= 0
+        available_reward = v * AVAILABLE_REWARD_SHARE
+        vesting_reward = v - available_reward
+        self.vesting_locked += vesting_reward
+        # This is slightly simplified from the real calculation, which handles
+        # rounding error more robustly.
+        each_vest = vesting_reward / VESTING_PERIOD_INTERVALS
+        e = (epoch // VESTING_INTERVAL) * VESTING_INTERVAL + VESTING_INTERVAL
+        while vesting_reward > 0.0:
+            vest_amount = min(each_vest, vesting_reward)
+            self.vesting_table[e] += vest_amount
+            vesting_reward -= vest_amount
+            e += VESTING_INTERVAL
+        return available_reward
 
     def _burn_fee(self, v: float):
         assert v >= 0

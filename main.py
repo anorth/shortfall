@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import sys
 import time
@@ -14,15 +15,19 @@ def main(args):
     epochs = 3 * YEAR + 1
     stats_interval = DAY
 
+    network = dataclasses.replace(MAINNET_APR_2023,
+        token_lease_fee=0.2,
+        reward_decay=REWARD_DECAY,
+    )
     # miner_factory=BurnShortfallMinerState.factory(balance=0)
     miner_factory = RepayRatchetShortfallMinerState.factory(
         balance=0,
-        max_repayment_term=3 * YEAR,
+        max_repayment_term=5 * YEAR,
         max_fee_reward_fraction=0.25,
         reward_projection_decay=REWARD_DECAY + BASELINE_GROWTH
     )
     cfg = SimConfig(
-        network=MAINNET_APR_2023,
+        network=network,
         strategy=StrategyConfig.pledge_limited(1000.0, 3 * YEAR, shortfall=1.0),
         # strategy=StrategyConfig.power_limited(100 * TIBIBYTE, 3 * YEAR, shortfall=1.0),
         miner_factory=miner_factory,

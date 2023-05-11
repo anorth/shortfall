@@ -89,10 +89,10 @@ class BurnShortfallMinerState(BaseMinerState):
 
     # Override
     def receive_reward(self, net: NetworkState, reward: float):
-        # Vesting is ignored.
         self._earn_reward(reward)
 
         # Calculate and burn shortfall fee
+        remaining_amount = reward
         if self.fee_pending > 0:
             # Approximate original pledge requirement as true pledge plus outstanding shortfall.
             # This starts off correct, but then underestimates as the shortfall is paid off,
@@ -111,6 +111,10 @@ class BurnShortfallMinerState(BaseMinerState):
                 fee_amount = min(reward * fee_take_rate, self.fee_pending)
                 self._burn_fee(fee_amount)
                 self.fee_pending -= fee_amount
+                remaining_amount -= fee_amount
+
+        # Split remainder of reward for vesting.
+        self._vest_reward(net.epoch, remaining_amount)
 
         # Repay lease if possible.
         self._repay(min(self.lease, self.available_balance()))
