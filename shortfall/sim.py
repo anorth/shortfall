@@ -19,7 +19,7 @@ class Simulator:
     def __init__(self, cfg: SimConfig):
         self.net = NetworkState(cfg.network)
         self.strategy = MinerStrategy(cfg.strategy)
-        self.rewards = RewardEmitter()
+        self.rewards = RewardEmitter(120)
         self.miner = cfg.miner_factory()
 
     def run(self, epochs, stats_interval=1) -> Iterable[Dict]:
@@ -62,8 +62,12 @@ class Simulator:
         return stats
 
 class RewardEmitter:
-    """An unrealistically smooth emission of a share of reward every epoch."""
+    """An unrealistically smooth emission of a share of reward every epoch interval."""
+
+    def __init__(self, interval: int = 1):
+        self.interval = interval
 
     def emit(self, net: NetworkState, m: BaseMinerState):
-        share = net.epoch_reward * m.power / net.power
-        m.receive_reward(net, share)
+        if net.epoch % self.interval == 0:
+            share = net.epoch_reward * self.interval * m.power / net.power
+            m.receive_reward(net, share)
