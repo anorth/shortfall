@@ -10,7 +10,7 @@ INITIAL_PLEDGE_PROJECTION_PERIOD = 20 * DAY
 # Reward at epoch = initial reward * (1-r)^epochs
 REWARD_DECAY = 1 - math.exp(math.log(1/2)/(6*YEAR))
 # Baseline at epoch = initial baseline * (1+b)^epochs
-BASELINE_GROWTH = math.exp(math.log(3)/YEAR) - 1
+BASELINE_GROWTH = math.exp(math.log(2)/YEAR) - 1
 
 
 @dataclass
